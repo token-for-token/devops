@@ -87,22 +87,32 @@ services:
 
   prisma:
     image: ghcr.io/token-for-token/hosted-gateway:main
-    command: ["sh", "-c", "bunx prisma migrate deploy && tail -f /dev/null"]
+    command: ["sh", "-c", "bunx prisma migrate deploy && bunx prisma studio --port 5555 --hostname 0.0.0.0 --browser none"]
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://hosted:hosted@postgres:5432/hosted_gateway?schema=public
     networks:
       - internal
+      - public
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
       resources:
         limits:
-          memory: 256M
+          memory: 512M
         reservations:
-          memory: 128M
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.routers.prisma.rule=Host(`prisma.t4t-gateway.com`)"
+        - "traefik.http.routers.prisma.entrypoints=websecure"
+        - "traefik.http.routers.prisma.tls.certresolver=le"
+        - "traefik.http.services.prisma.loadbalancer.server.port=5555"
+        - "traefik.http.routers.prisma.middlewares=admin-auth"
     logging:
       driver: loki
       options:
