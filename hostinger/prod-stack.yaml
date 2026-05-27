@@ -204,6 +204,10 @@ services:
     command:
       - start
       - --blockchain-rpc-endpoint=https://rpc.gnosischain.com
+      # The default bootnodes (mainnet.ethswarm.org) all reject Bee 2.7.x's
+      # v14 handshake — fresh nodes can't bootstrap. Use the homelab Bee
+      # (also 2.7.2-rc1, well-connected) as our entry point into the swarm.
+      - --bootnode=/dns4/bee.ffaerber.duckdns.org/tcp/1634/p2p/QmZTZyeQhFBMtta9XhtHUoLE3EtDKrzv76uoQX9h9SowQC
     env_file:
       - .env
     environment:
