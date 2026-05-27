@@ -44,6 +44,9 @@ services:
       - --providers.swarm.constraints=Label(`traefik.constraint-label`, `public`)
       - --providers.swarm.exposedByDefault=false
       - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
       - --entrypoints.websecure.address=:443
       - --certificatesresolvers.le.acme.email=t4t-gateway@proton.me
       - --certificatesresolvers.le.acme.storage=/certificates/acme.json
