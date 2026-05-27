@@ -204,6 +204,11 @@ services:
     environment:
       BEE_API_ADDR: ":1633"
       BEE_P2P_ADDR: ":1634"
+      # Tell Bee its public-facing libp2p address so the autonat check
+      # passes and peers learn to dial our node back. Without this Bee
+      # advertises only docker-bridge IPs (172.x / 127.0.0.1) and stays
+      # marked "Private" — PSS forwarding gets blackholed.
+      BEE_NAT_ADDR: "195.35.25.26:1634"
       BEE_VERBOSITY: "info"
       BEE_FULL_NODE: "true"
       BEE_SWAP_ENABLE: "true"
