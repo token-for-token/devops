@@ -151,7 +151,12 @@ services:
 
   bee:
     image: ethersphere/bee:latest
-    command: start
+    # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT is silently ignored by Bee 2.8 — pass
+    # the flag explicitly. Without it Bee logs "chain backend disabled" and
+    # exits with "factory fail: chain disabled".
+    command:
+      - start
+      - --blockchain-rpc-endpoint=https://rpc.gnosischain.com
     env_file:
       - .env
     environment:
@@ -159,9 +164,7 @@ services:
       BEE_P2P_ADDR: ":1634"
       BEE_VERBOSITY: "info"
       BEE_FULL_NODE: "false"
-      BEE_BLOCKCHAIN_RPC_ENDPOINT: "https://rpc.gnosischain.com"
       BEE_SWAP_ENABLE: "true"
-      BEE_CHAIN_ENABLE: "true"
       BEE_NETWORK_ID: "1"
       BEE_WELCOME_MESSAGE: "t4t-gateway"
       BEE_DATA_DIR: /home/bee/.bee
