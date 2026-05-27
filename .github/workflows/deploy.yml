@@ -18,8 +18,11 @@ jobs:
           key: ${{ secrets.SSH_PRIV_KEY }}
           script: |
             cd ~/devops && git pull
-            docker stack deploy -c ~/devops/hostinger/system-stack.yaml system --with-registry-auth
-            docker stack deploy -c ~/devops/hostinger/prod-stack.yaml prod --with-registry-auth
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/token-for-token/hosted-gateway:main
+            docker pull ghcr.io/token-for-token/hosted-gateway-frontend:main
+            docker stack deploy -c ~/devops/hostinger/system-stack.yaml system --with-registry-auth --resolve-image always
+            docker stack deploy -c ~/devops/hostinger/prod-stack.yaml prod --with-registry-auth --resolve-image always
 
       - name: prune old images
         uses: appleboy/ssh-action@v1.0.3
