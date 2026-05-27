@@ -212,6 +212,11 @@ services:
       BEE_DATA_DIR: /home/bee/.bee
     volumes:
       - bee-data:/home/bee/.bee
+    ports:
+      # libp2p P2P — must be reachable from the public internet so other Bee
+      # nodes can dial back. Without this, the node only outbound-dials and
+      # can't sustain enough peers for PSS routing.
+      - "1634:1634"
     networks:
       - internal
     deploy:
