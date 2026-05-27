@@ -1,0 +1,31 @@
+name: Deploy stacks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: docker stack deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          username: root
+          host: ${{ secrets.SSH_KNOWN_HOSTS }}
+          key: ${{ secrets.SSH_PRIV_KEY }}
+          script: |
+            cd ~/devops && git pull
+            docker stack deploy -c ~/devops/hostinger/system-stack.yaml system --with-registry-auth
+            docker stack deploy -c ~/devops/hostinger/prod-stack.yaml prod --with-registry-auth
+
+      - name: prune old images
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          username: root
+          host: ${{ secrets.SSH_KNOWN_HOSTS }}
+          key: ${{ secrets.SSH_PRIV_KEY }}
+          script: |
+            docker image prune -f --filter "until=24h"

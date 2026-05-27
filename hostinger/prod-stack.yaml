@@ -1,0 +1,201 @@
+version: '3.8'
+
+networks:
+  public:
+    external: true
+  internal:
+    external: true
+
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  bee-data:
+    driver: local
+
+
+services:
+
+  api:
+    image: ghcr.io/token-for-token/hosted-gateway:main
+    command: ["bun", "run", "src/api.ts"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://hosted:hosted@postgres:5432/hosted_gateway?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BEE_API_URL: http://bee:1633
+      HOSTED_GATEWAY_PORT: 8080
+    networks:
+      - public
+      - internal
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        order: start-first
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 512M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.routers.api.rule=Host(`api.t4t-gateway.com`,`t4t-gateway.com`,`www.t4t-gateway.com`)"
+        - "traefik.http.routers.api.entrypoints=websecure"
+        - "traefik.http.routers.api.tls.certresolver=le"
+        - "traefik.http.services.api.loadbalancer.server.port=8080"
+        - "traefik.http.routers.api.middlewares=redirect-to-https"
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  worker:
+    image: ghcr.io/token-for-token/hosted-gateway:main
+    command: ["bun", "run", "src/worker.ts"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://hosted:hosted@postgres:5432/hosted_gateway?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BEE_API_URL: http://bee:1633
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 512M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  prisma:
+    image: ghcr.io/token-for-token/hosted-gateway:main
+    command: ["sh", "-c", "bunx prisma migrate deploy && tail -f /dev/null"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://hosted:hosted@postgres:5432/hosted_gateway?schema=public
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  postgres:
+    image: postgres:16
+    networks:
+      - internal
+    environment:
+      POSTGRES_USER: hosted
+      POSTGRES_PASSWORD: hosted
+      POSTGRES_DB: hosted_gateway
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 512M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  redis:
+    image: redis:7
+    networks:
+      - internal
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  bee:
+    image: ethersphere/bee:latest
+    command: start
+    env_file:
+      - .env
+    environment:
+      BEE_API_ADDR: ":1633"
+      BEE_P2P_ADDR: ":1634"
+      BEE_VERBOSITY: "info"
+      BEE_FULL_NODE: "false"
+      BEE_SWAP_ENABLE: "true"
+      BEE_CHAIN_ENABLE: "true"
+      BEE_NETWORK_ID: "1"
+      BEE_WELCOME_MESSAGE: "t4t-gateway"
+      BEE_DATA_DIR: /home/bee/.bee
+    volumes:
+      - bee-data:/home/bee/.bee
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 512M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    networks:
+      - internal
+    environment:
+      DATA_SOURCE_NAME: "postgresql://hosted:hosted@postgres:5432/hosted_gateway?sslmode=disable"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"

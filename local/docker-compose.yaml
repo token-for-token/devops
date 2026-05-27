@@ -1,0 +1,108 @@
+# Local dev stack for the hosted gateway. Brings up everything the gateway
+# needs to serve `/v1/chat/completions` end-to-end against a forked Gnosis
+# chain + a real t4t-provider talking to a mock Ollama.
+#
+# Run from `devops/local/`: `make dev-up` / `docker compose up`.
+
+services:
+
+  postgres:
+    image: postgres:16
+    env_file: [.env]
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [dev]
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 30
+    networks: [dev]
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    pull_policy: always
+    command:
+      - anvil
+      - --host=0.0.0.0
+      - --port=8545
+      - --chain-id=100
+      - --fork-url=${GNOSIS_RPC_URL_UPSTREAM:-https://rpc.gnosischain.com}
+      - --block-time=1
+    environment:
+      ANVIL_IP_ADDR: "0.0.0.0"
+    expose:
+      - "8545"
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test: ["CMD-SHELL", "cast block-number --rpc-url http://localhost:8545 >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+    networks: [dev]
+
+  bee:
+    image: ethersphere/bee:latest
+    command: dev
+    ports:
+      - "1633:1633"
+    networks: [dev]
+
+  # Prisma migration step — runs once on `up`, then exits.
+  prisma:
+    build:
+      context: ../../hosted-gateway
+    command: ["sh", "-c", "bunx prisma migrate deploy"]
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [dev]
+
+  api:
+    build:
+      context: ../../hosted-gateway
+    command: ["bun", "run", "src/api.ts"]
+    env_file: [.env]
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      anvil: { condition: service_healthy }
+      bee: { condition: service_started }
+      prisma: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    networks: [dev]
+
+  worker:
+    build:
+      context: ../../hosted-gateway
+    command: ["bun", "run", "src/worker.ts"]
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      anvil: { condition: service_healthy }
+      bee: { condition: service_started }
+      prisma: { condition: service_completed_successfully }
+    networks: [dev]
+
+networks:
+  dev:
+    driver: bridge

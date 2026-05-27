@@ -1,0 +1,145 @@
+version: '3.8'
+
+# Staging environment — points at the `develop` image tag, mounted on a
+# separate dev.t4t-gateway.com subdomain. Shares the same overlay networks
+# but uses its own postgres/redis/bee volumes so prod data is untouched.
+
+networks:
+  public:
+    external: true
+  internal:
+    external: true
+
+
+volumes:
+  postgres-data-dev:
+    driver: local
+  redis-data-dev:
+    driver: local
+  bee-data-dev:
+    driver: local
+
+
+services:
+
+  api:
+    image: ghcr.io/token-for-token/hosted-gateway:develop
+    command: ["bun", "run", "src/api.ts"]
+    env_file:
+      - .env.dev
+    environment:
+      DATABASE_URL: postgresql://hosted:hosted@postgres-dev:5432/hosted_gateway?schema=public
+      REDIS_HOST: redis-dev
+      REDIS_PORT: 6379
+      BEE_API_URL: http://bee-dev:1633
+      HOSTED_GATEWAY_PORT: 8080
+    networks:
+      - public
+      - internal
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.routers.api-dev.rule=Host(`dev.t4t-gateway.com`)"
+        - "traefik.http.routers.api-dev.entrypoints=websecure"
+        - "traefik.http.routers.api-dev.tls.certresolver=le"
+        - "traefik.http.services.api-dev.loadbalancer.server.port=8080"
+        - "traefik.http.routers.api-dev.middlewares=redirect-to-https"
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  worker:
+    image: ghcr.io/token-for-token/hosted-gateway:develop
+    command: ["bun", "run", "src/worker.ts"]
+    env_file:
+      - .env.dev
+    environment:
+      DATABASE_URL: postgresql://hosted:hosted@postgres-dev:5432/hosted_gateway?schema=public
+      REDIS_HOST: redis-dev
+      REDIS_PORT: 6379
+      BEE_API_URL: http://bee-dev:1633
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  postgres-dev:
+    image: postgres:16
+    networks:
+      - internal
+    environment:
+      POSTGRES_USER: hosted
+      POSTGRES_PASSWORD: hosted
+      POSTGRES_DB: hosted_gateway
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  redis-dev:
+    image: redis:7
+    networks:
+      - internal
+    volumes:
+      - redis-data-dev:/data
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  bee-dev:
+    image: ethersphere/bee:latest
+    command: dev
+    networks:
+      - internal
+    volumes:
+      - bee-data-dev:/home/bee/.bee
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"

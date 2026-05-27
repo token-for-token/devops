@@ -1,0 +1,166 @@
+# Local test stack for the hosted gateway. The smart contracts are NOT
+# deployed here — they're managed by the t4t repo and already live on Gnosis
+# mainnet. The anvil service forks Gnosis mainnet so those addresses are
+# usable as-is.
+#
+# Funding (giving the operator + test-provider xBZZ and xDAI on the fork) is
+# handled inside `test/setup.ts` via viem's anvil test actions
+# (anvil_setBalance + impersonateAccount on an xBZZ whale).
+#
+# Run from `devops/local/`: `make test SPEC=accounts` / `make test-all`.
+
+services:
+
+  postgres:
+    image: postgres:16
+    env_file: [.env]
+    expose:
+      - "5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks: [test]
+
+  redis:
+    image: redis:7
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+    networks: [test]
+
+  # Anvil + Bee are only needed by specs that hit chain / Swarm. Profile-gated
+  # so `make test SPEC=auth` runs without them; `make test SPEC=gateway` adds
+  # the gateway profile.
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    pull_policy: always
+    profiles: [gateway]
+    # The foundry image's ENTRYPOINT is `["/bin/sh", "-c"]`, which interprets
+    # only its FIRST argument as the command — anvil's flags then ended up as
+    # shell positional params and were silently dropped. Override the
+    # entrypoint to invoke anvil directly. Don't pass `--chain-id` here —
+    # `--fork-url` propagates the chain id (100) automatically.
+    entrypoint: ["anvil"]
+    command:
+      - --host=0.0.0.0
+      - --port=8545
+      - --fork-url=https://rpc.gnosischain.com
+      - --block-time=1
+    environment:
+      ANVIL_IP_ADDR: "0.0.0.0"
+    expose:
+      - "8545"
+    healthcheck:
+      test: ["CMD-SHELL", "cast block-number --rpc-url http://localhost:8545 >/dev/null 2>&1"]
+      interval: 3s
+      retries: 60
+      start_period: 60s
+    networks: [test]
+
+  # Local Bee was removed — see devops/local/.env BEE_API_URL. We hit
+  # bee.ffaerber.duckdns.org (real running Bee node) for PSS routing + Swarm
+  # uploads. Faster than the local dev container and avoids the dev-mode
+  # postage / wget healthcheck quirks.
+
+  prisma:
+    build:
+      context: ../../hosted-gateway
+    command: ["sh", "-c", "bunx prisma migrate deploy"]
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [test]
+
+  api:
+    build:
+      context: ../../hosted-gateway
+    command: ["bun", "run", "src/api.ts"]
+    env_file: [.env]
+    environment:
+      NODE_ENV: test
+    expose:
+      - "8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      prisma: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [test]
+
+  worker:
+    build:
+      context: ../../hosted-gateway
+    command: ["bun", "run", "src/worker.ts"]
+    env_file: [.env]
+    environment:
+      NODE_ENV: test
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      prisma: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep 'src/worker.ts' | grep -v grep || exit 1"]
+      interval: 3s
+      retries: 30
+    networks: [test]
+
+  # The existing t4t-container in provider mode. Reads the canonical Gnosis
+  # mainnet contract addresses from its baked defaults (see
+  # t4t/container/src/lib/config.ts) — those addresses are valid on the anvil
+  # fork too. Funding (xBZZ + xDAI on the fork) happens in `test/setup.ts`.
+  #
+  # Profile-gated: only specs that actually need to settle a chat completion
+  # on-chain require this container. `make test SPEC=auth` / `make test
+  # SPEC=accounts` skip it; `make test SPEC=gateway` activates the profile.
+  t4t-provider:
+    image: ghcr.io/token-for-token/t4t:latest
+    pull_policy: missing
+    profiles: [gateway]
+    environment:
+      T4T_MODE: provider
+      T4T_OLLAMA_URL: http://mock-ollama:11434
+      GNOSIS_RPC_URL: http://anvil:8545
+      BEE_API_URL: http://bee:1633
+    depends_on:
+      anvil: { condition: service_healthy }
+      mock-ollama: { condition: service_started }
+    networks: [test]
+
+  mock-ollama:
+    build:
+      context: ./mock-ollama
+    profiles: [gateway]
+    expose:
+      - "11434"
+    networks: [test]
+
+  bun:
+    build:
+      context: ../../hosted-gateway
+    # The leading `$$` escapes compose's variable substitution so the inner
+    # shell expands $SPEC_GLOB at runtime (where `make test` set it via `-e`).
+    command: ["sh", "-c", "bun test --timeout 60000 $${SPEC_GLOB:-./test/**/*.e2e-spec.ts}"]
+    env_file: [.env]
+    environment:
+      NODE_ENV: test
+      HOSTED_GATEWAY_URL: http://api:8080
+    depends_on:
+      api: { condition: service_healthy }
+      worker: { condition: service_healthy }
+    networks: [test]
+
+networks:
+  test:
+    driver: bridge

@@ -1,0 +1,232 @@
+version: '3.8'
+
+
+networks:
+  public:
+    name: public
+    driver: overlay
+
+  internal:
+    name: internal
+    driver: overlay
+
+
+volumes:
+  traefik-letsencrypt:
+    driver: local
+  traefik-logs:
+    driver: local
+  grafana-data:
+    driver: local
+  loki-data:
+    driver: local
+  prometheus-data:
+    driver: local
+
+
+configs:
+  loki_config:
+    file: ./loki.yaml
+  prometheus_config:
+    file: ./prometheus.yml
+
+
+services:
+
+  traefik:
+    image: traefik:v2.11.22
+    ports:
+      - "80:80"
+      - "443:443"
+    command:
+      - --providers.docker
+      - --providers.docker.network=public
+      - --providers.docker.constraints=Label(`traefik.constraint-label`, `public`)
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.swarmmode
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=t4t-gateway@proton.me
+      - --certificatesresolvers.le.acme.storage=/certificates/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --api=true
+      - --api.dashboard=true
+      - --metrics.prometheus=true
+      - --accesslog=true
+      - --log=true
+    networks:
+      - public
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - traefik-letsencrypt:/certificates
+      - traefik-logs:/var/log/traefik
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.routers.dashboard.service=api@internal"
+        - "traefik.http.routers.traefikk.rule=Host(`traefik.t4t-gateway.com`)"
+        - "traefik.http.routers.traefikk.entrypoints=websecure"
+        - "traefik.http.routers.traefikk.tls.certresolver=le"
+        - "traefik.http.routers.traefikk.middlewares=admin-auth"
+        - "traefik.http.services.traefikk.loadbalancer.server.port=8080"
+        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$EyLN9D7y$$4v2q7sYTN7aIlE2yeujRJ/"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  grafana:
+    image: grafana/grafana:12.4.2
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - public
+      - internal
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.grafana.rule=Host(`grafana.t4t-gateway.com`)"
+        - "traefik.http.routers.grafana.entrypoints=websecure"
+        - "traefik.http.routers.grafana.tls.certresolver=le"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$EyLN9D7y$$4v2q7sYTN7aIlE2yeujRJ/"
+        - "traefik.http.routers.grafana.middlewares=admin-auth,redirect-to-https"
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  loki:
+    image: grafana/loki:2.9.7
+    networks:
+      - public
+      - internal
+    configs:
+      - source: loki_config
+        target: /etc/loki/loki.yaml
+    volumes:
+      - loki-data:/loki
+    command: -config.file=/etc/loki/loki.yaml
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.loki.rule=Host(`loki.t4t-gateway.com`)"
+        - "traefik.http.routers.loki.entrypoints=websecure"
+        - "traefik.http.routers.loki.tls.certresolver=le"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.services.loki.loadbalancer.server.port=3100"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  prometheus:
+    image: prom/prometheus:v3.7.2
+    networks:
+      - public
+      - internal
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus-data:/prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 512M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.prometheus.rule=Host(`prometheus.t4t-gateway.com`)"
+        - "traefik.http.routers.prometheus.entrypoints=websecure"
+        - "traefik.http.routers.prometheus.tls.certresolver=le"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$EyLN9D7y$$4v2q7sYTN7aIlE2yeujRJ/"
+        - "traefik.http.routers.prometheus.middlewares=admin-auth"
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  node-exporter:
+    image: prom/node-exporter:master
+    command: --path.rootfs=/host
+    networks:
+      - internal
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 32M
+        reservations:
+          memory: 24M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    networks:
+      - internal
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 65M
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
