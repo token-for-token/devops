@@ -78,7 +78,7 @@ services:
         - "traefik.http.routers.traefikk.tls.certresolver=le"
         - "traefik.http.routers.traefikk.middlewares=admin-auth"
         - "traefik.http.services.traefikk.loadbalancer.server.port=8080"
-        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$EyLN9D7y$$4v2q7sYTN7aIlE2yeujRJ/"
+        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$w3jsONTx$$8byZ1a/GOfoKumowv773P."
         - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
         - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
     logging:
@@ -119,7 +119,7 @@ services:
         - "traefik.docker.network=public"
         - "traefik.constraint-label=public"
         - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$EyLN9D7y$$4v2q7sYTN7aIlE2yeujRJ/"
+        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$w3jsONTx$$8byZ1a/GOfoKumowv773P."
         - "traefik.http.routers.grafana.middlewares=admin-auth,redirect-to-https"
     logging:
       driver: loki
@@ -184,7 +184,7 @@ services:
         - "traefik.docker.network=public"
         - "traefik.constraint-label=public"
         - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
-        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$EyLN9D7y$$4v2q7sYTN7aIlE2yeujRJ/"
+        - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$w3jsONTx$$8byZ1a/GOfoKumowv773P."
         - "traefik.http.routers.prometheus.middlewares=admin-auth"
     logging:
       driver: loki
