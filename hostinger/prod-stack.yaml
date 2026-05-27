@@ -46,7 +46,7 @@ services:
         - "traefik.enable=true"
         - "traefik.docker.network=public"
         - "traefik.constraint-label=public"
-        - "traefik.http.routers.api.rule=Host(`api.t4t-gateway.com`,`t4t-gateway.com`,`www.t4t-gateway.com`)"
+        - "traefik.http.routers.api.rule=Host(`api.t4t-gateway.com`) || Host(`t4t-gateway.com`) || Host(`www.t4t-gateway.com`)"
         - "traefik.http.routers.api.entrypoints=websecure"
         - "traefik.http.routers.api.tls.certresolver=le"
         - "traefik.http.services.api.loadbalancer.server.port=8080"
