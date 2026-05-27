@@ -192,11 +192,7 @@ services:
 
 
   bee:
-    # Pinned to 2.7.2-rc1 — same version the working remote node at
-    # bee.ffaerber.duckdns.org runs (25 live peers). 2.7.1 + 2.8.0 hit a
-    # `/swarm/handshake/14.0.0/handshake` protocol mismatch against the live
-    # mainnet bootnodes.
-    image: ethersphere/bee:2.7.2-rc1
+    image: ethersphere/bee:2.8.0
     # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT is silently ignored by Bee 2.8 — pass
     # the flag explicitly. Without it Bee logs "chain backend disabled" and
     # exits with "factory fail: chain disabled".
