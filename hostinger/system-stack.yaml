@@ -50,7 +50,6 @@ services:
       - --certificatesresolvers.le.acme.tlschallenge=true
       - --api=true
       - --api.dashboard=true
-      - --api.insecure=true
       - --metrics.prometheus=true
       - --accesslog=true
       - --log=true
