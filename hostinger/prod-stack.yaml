@@ -192,7 +192,10 @@ services:
 
 
   bee:
-    image: ethersphere/bee:latest
+    # Pinned to 2.7.1: Bee 2.8 ships handshake protocol v14 which the live
+    # mainnet bootnodes don't negotiate yet — node ends up isolated. Revisit
+    # when the network upgrades.
+    image: ethersphere/bee:2.7.1
     # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT is silently ignored by Bee 2.8 — pass
     # the flag explicitly. Without it Bee logs "chain backend disabled" and
     # exits with "factory fail: chain disabled".
