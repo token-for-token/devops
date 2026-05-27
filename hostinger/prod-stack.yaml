@@ -159,6 +159,7 @@ services:
       BEE_P2P_ADDR: ":1634"
       BEE_VERBOSITY: "info"
       BEE_FULL_NODE: "false"
+      BEE_BLOCKCHAIN_RPC_ENDPOINT: "https://rpc.gnosischain.com"
       BEE_SWAP_ENABLE: "true"
       BEE_CHAIN_ENABLE: "true"
       BEE_NETWORK_ID: "1"
