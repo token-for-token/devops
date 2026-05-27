@@ -87,7 +87,10 @@ services:
 
   prisma:
     image: ghcr.io/token-for-token/hosted-gateway:main
-    command: ["sh", "-c", "bunx prisma migrate deploy && bunx prisma studio --port 5555"]
+    # ln -sf /bin/true /usr/local/bin/xdg-open  → Prisma 7's studio CLI hard-
+    # codes a browser-launch via xdg-open and bubbles the spawn-ENOENT to
+    # process exit. There's no --browser flag any more, so stub it out.
+    command: ["sh", "-c", "ln -sf /bin/true /usr/local/bin/xdg-open && bunx prisma migrate deploy && bunx prisma studio --port 5555"]
     env_file:
       - .env
     environment:
