@@ -192,7 +192,12 @@ services:
 
 
   bee:
-    image: ethersphere/bee:2.8.0
+    # Pinned to 2.7.2-rc1 to match the homelab Bee — both speak the
+    # /swarm/handshake/14.0.0 protocol so they can peer directly. Bee 2.8
+    # bumped the handshake version, and the homelab's existing data dir
+    # won't boot cleanly under 2.8, so prod stays here until that's
+    # untangled upstream.
+    image: ethersphere/bee:2.7.2-rc1
     # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT is silently ignored by Bee 2.8 — pass
     # the flag explicitly. Without it Bee logs "chain backend disabled" and
     # exits with "factory fail: chain disabled".
