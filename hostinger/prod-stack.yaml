@@ -56,7 +56,7 @@ services:
       DATABASE_URL: postgresql://hosted:hosted@postgres:5432/hosted_gateway?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      BEE_API_URL: https://bee.ffaerber.duckdns.org
+      BEE_API_URL: http://bee:1633
       HOSTED_GATEWAY_PORT: 8080
     networks:
       - public
@@ -95,7 +95,7 @@ services:
       DATABASE_URL: postgresql://hosted:hosted@postgres:5432/hosted_gateway?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      BEE_API_URL: https://bee.ffaerber.duckdns.org
+      BEE_API_URL: http://bee:1633
     networks:
       - internal
     deploy:
