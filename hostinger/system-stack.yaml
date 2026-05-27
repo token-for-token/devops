@@ -34,16 +34,15 @@ configs:
 services:
 
   traefik:
-    image: traefik:v2.11.22
+    image: traefik:v3.7.1
     ports:
       - "80:80"
       - "443:443"
     command:
-      - --providers.docker
-      - --providers.docker.network=public
-      - --providers.docker.constraints=Label(`traefik.constraint-label`, `public`)
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.swarmmode
+      - --providers.swarm.endpoint=unix:///var/run/docker.sock
+      - --providers.swarm.network=public
+      - --providers.swarm.constraints=Label(`traefik.constraint-label`, `public`)
+      - --providers.swarm.exposedByDefault=false
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --certificatesresolvers.le.acme.email=t4t-gateway@proton.me
