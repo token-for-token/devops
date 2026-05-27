@@ -18,6 +18,35 @@ volumes:
 
 services:
 
+  frontend:
+    image: ghcr.io/token-for-token/hosted-gateway-frontend:main
+    networks:
+      - public
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        order: start-first
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.routers.frontend.rule=Host(`t4t-gateway.com`) || Host(`www.t4t-gateway.com`)"
+        - "traefik.http.routers.frontend.entrypoints=websecure"
+        - "traefik.http.routers.frontend.tls.certresolver=le"
+        - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+        - "traefik.http.routers.frontend.middlewares=redirect-to-https"
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://loki.t4t-gateway.com/loki/api/v1/push"
+
+
   api:
     image: ghcr.io/token-for-token/hosted-gateway:main
     command: ["bun", "run", "src/api.ts"]
@@ -46,7 +75,7 @@ services:
         - "traefik.enable=true"
         - "traefik.docker.network=public"
         - "traefik.constraint-label=public"
-        - "traefik.http.routers.api.rule=Host(`api.t4t-gateway.com`) || Host(`t4t-gateway.com`) || Host(`www.t4t-gateway.com`)"
+        - "traefik.http.routers.api.rule=Host(`api.t4t-gateway.com`)"
         - "traefik.http.routers.api.entrypoints=websecure"
         - "traefik.http.routers.api.tls.certresolver=le"
         - "traefik.http.services.api.loadbalancer.server.port=8080"
