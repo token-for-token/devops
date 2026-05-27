@@ -205,7 +205,7 @@ services:
       BEE_API_ADDR: ":1633"
       BEE_P2P_ADDR: ":1634"
       BEE_VERBOSITY: "info"
-      BEE_FULL_NODE: "false"
+      BEE_FULL_NODE: "true"
       BEE_SWAP_ENABLE: "true"
       BEE_NETWORK_ID: "1"
       BEE_WELCOME_MESSAGE: "t4t-gateway"
