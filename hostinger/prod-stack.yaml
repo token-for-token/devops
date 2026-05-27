@@ -87,7 +87,7 @@ services:
 
   prisma:
     image: ghcr.io/token-for-token/hosted-gateway:main
-    command: ["sh", "-c", "bunx prisma migrate deploy && bunx prisma studio --port 5555 --hostname 0.0.0.0 --browser none"]
+    command: ["sh", "-c", "bunx prisma migrate deploy && bunx prisma studio --port 5555"]
     env_file:
       - .env
     environment:
