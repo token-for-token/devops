@@ -192,22 +192,15 @@ services:
 
 
   bee:
-    # Pinned to 2.7.2-rc1 to match the homelab Bee — both speak the
-    # /swarm/handshake/14.0.0 protocol so they can peer directly. Bee 2.8
-    # bumped the handshake version, and the homelab's existing data dir
-    # won't boot cleanly under 2.8, so prod stays here until that's
-    # untangled upstream.
-    image: ethersphere/bee:2.7.2-rc1
-    # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT is silently ignored by Bee 2.8 — pass
-    # the flag explicitly. Without it Bee logs "chain backend disabled" and
-    # exits with "factory fail: chain disabled".
+    # Pinned to 2.8.0 — matches the homelab Bee. Both speak the v15
+    # handshake. Homelab uses a fresh data dir + --target-neighborhood
+    # to keep the same swarmOverlay as its on-chain provider registration.
+    image: ethersphere/bee:2.8.0
+    # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT env var is silently ignored — pass
+    # the flag explicitly. Without it Bee logs "chain backend disabled".
     command:
       - start
       - --blockchain-rpc-endpoint=https://rpc.gnosischain.com
-      # The default bootnodes (mainnet.ethswarm.org) all reject Bee 2.7.x's
-      # v14 handshake — fresh nodes can't bootstrap. Use the homelab Bee
-      # (also 2.7.2-rc1, well-connected) as our entry point into the swarm.
-      - --bootnode=/dns4/bee.ffaerber.duckdns.org/tcp/1634/p2p/QmZTZyeQhFBMtta9XhtHUoLE3EtDKrzv76uoQX9h9SowQC
     env_file:
       - .env
     environment:
