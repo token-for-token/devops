@@ -228,6 +228,12 @@ services:
       BEE_NETWORK_ID: "1"
       BEE_WELCOME_MESSAGE: "t4t-gateway"
       BEE_DATA_DIR: /home/bee/.bee
+      # Pin homelab_bee as a static peer so the libp2p connection survives
+      # routing-table churn. Without this, PSS chunks the homelab pushes
+      # toward us are landing at random ff-prefix peers (e.g. ff7adaed)
+      # instead of prod_bee at ff896a93, so the gateway never receives
+      # provider ack/deliver envelopes.
+      BEE_STATIC_NODES: "/dns4/bee.ffaerber.duckdns.org/tcp/1634/p2p/QmZTZyeQhFBMtta9XhtHUoLE3EtDKrzv76uoQX9h9SowQC"
     volumes:
       - bee-data:/home/bee/.bee
     ports:
