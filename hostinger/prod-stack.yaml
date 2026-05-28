@@ -14,6 +14,8 @@ volumes:
     driver: local
   bee-data:
     driver: local
+  pss-key:
+    driver: local
 
 
 services:
@@ -58,6 +60,12 @@ services:
       REDIS_PORT: 6379
       BEE_API_URL: http://bee:1633
       HOSTED_GATEWAY_PORT: 8080
+      PSS_KEY_PATH: /data/pss.key
+    volumes:
+      # Shared PSS key file — all replicas use the same identity so providers'
+      # PSS replies can be decrypted regardless of which replica handled the
+      # initial request.
+      - pss-key:/data
     networks:
       - public
       - internal
@@ -96,6 +104,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       BEE_API_URL: http://bee:1633
+      PSS_KEY_PATH: /data/pss.key
+    volumes:
+      - pss-key:/data
     networks:
       - internal
     deploy:
