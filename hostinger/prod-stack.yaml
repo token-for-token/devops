@@ -233,9 +233,11 @@ services:
       # toward us are landing at random ff-prefix peers (e.g. ff7adaed)
       # instead of prod_bee at ff896a93, so the gateway never receives
       # provider ack/deliver envelopes.
-      # Bee 2.8 requires bootnode-mode for --static-nodes to take effect.
-      BEE_BOOTNODE_MODE: "true"
-      BEE_STATIC_NODES: "bd85c9a7508a61d3fc128144da3ae36a1977bcb6ad93b8f4a07e7e644e14706e"
+      # Seed homelab_bee alongside the default mainnet bootnode so we
+      # always dial it on boot. (We can't use --static-nodes here: Bee 2.8
+      # only honors it in --bootnode-mode, and bootnode-mode wrecks normal
+      # peer discovery.)
+      BEE_BOOTNODE: "/dns4/bee.ffaerber.duckdns.org/tcp/1634/p2p/QmZTZyeQhFBMtta9XhtHUoLE3EtDKrzv76uoQX9h9SowQC,/dnsaddr/mainnet.ethswarm.org"
     volumes:
       - bee-data:/home/bee/.bee
     ports:
