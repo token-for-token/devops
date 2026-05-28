@@ -233,7 +233,7 @@ services:
       # toward us are landing at random ff-prefix peers (e.g. ff7adaed)
       # instead of prod_bee at ff896a93, so the gateway never receives
       # provider ack/deliver envelopes.
-      BEE_STATIC_NODES: "/dns4/bee.ffaerber.duckdns.org/tcp/1634/p2p/QmZTZyeQhFBMtta9XhtHUoLE3EtDKrzv76uoQX9h9SowQC"
+      BEE_STATIC_NODES: "bd85c9a7508a61d3fc128144da3ae36a1977bcb6ad93b8f4a07e7e644e14706e"
     volumes:
       - bee-data:/home/bee/.bee
     ports:
