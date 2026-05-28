@@ -233,6 +233,8 @@ services:
       # toward us are landing at random ff-prefix peers (e.g. ff7adaed)
       # instead of prod_bee at ff896a93, so the gateway never receives
       # provider ack/deliver envelopes.
+      # Bee 2.8 requires bootnode-mode for --static-nodes to take effect.
+      BEE_BOOTNODE_MODE: "true"
       BEE_STATIC_NODES: "bd85c9a7508a61d3fc128144da3ae36a1977bcb6ad93b8f4a07e7e644e14706e"
     volumes:
       - bee-data:/home/bee/.bee
