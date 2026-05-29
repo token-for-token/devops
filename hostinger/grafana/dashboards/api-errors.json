@@ -1,0 +1,83 @@
+{
+  "title": "Hosted-gateway API — errors & PSS inbox",
+  "uid": "t4t-api-errors",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "tags": ["t4t", "api"],
+  "time": {"from": "now-1h", "to": "now"},
+  "templating": {"list": []},
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Errors per minute (api + worker)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "sum by (swarm_service) (count_over_time({swarm_service=~\"prod_(api|worker)\"} |~ \"(?i)\\\"level\\\":(50|40)\" [1m]))",
+          "legendFormat": "{{swarm_service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "logs", "custom": {"drawStyle": "bars", "fillOpacity": 60}}}
+    },
+    {
+      "type": "stat",
+      "title": "Acks last 15m",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "sum(count_over_time({swarm_service=\"prod_api\"} |~ \"ack received\" [15m]))",
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area"}
+    },
+    {
+      "type": "stat",
+      "title": "Deliveries last 15m",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "sum(count_over_time({swarm_service=\"prod_api\"} |~ \"envelope dispatched\" |~ \"job_deliver\" [15m]))",
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area"}
+    },
+    {
+      "type": "logs",
+      "title": "API — errors",
+      "gridPos": {"h": 14, "w": 24, "x": 0, "y": 8},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "{swarm_service=~\"prod_(api|worker)\"} |~ \"(?i)\\\"level\\\":(50|40)\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "PSS inbox traffic",
+      "gridPos": {"h": 14, "w": 24, "x": 0, "y": 22},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "{swarm_service=\"prod_api\"} |~ \"pss/inbox|ack received|delivered\"",
+          "refId": "A"
+        }
+      ],
+      "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}
+    }
+  ]
+}

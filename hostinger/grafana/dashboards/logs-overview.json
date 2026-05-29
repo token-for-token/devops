@@ -1,0 +1,78 @@
+{
+  "title": "Logs — All services",
+  "uid": "t4t-logs-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 0,
+  "refresh": "10s",
+  "tags": ["t4t", "loki"],
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "loki"},
+        "label": "Service",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {"text": "All", "value": "$__all"},
+        "query": "label_values(swarm_service)",
+        "sort": 1
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Search",
+        "current": {"text": "", "value": ""}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Log volume per service",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "sum by (swarm_service) (count_over_time({swarm_service=~\"$service\"} |~ \"(?i)$search\" [1m]))",
+          "legendFormat": "{{swarm_service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "stacking": {"mode": "normal"}},
+          "unit": "logs"
+        }
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]}}
+    },
+    {
+      "type": "logs",
+      "title": "Live logs",
+      "gridPos": {"h": 22, "w": 24, "x": 0, "y": 8},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "expr": "{swarm_service=~\"$service\"} |~ \"(?i)$search\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

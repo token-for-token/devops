@@ -29,6 +29,14 @@ configs:
     file: ./loki.yaml
   prometheus_config:
     file: ./prometheus.yml
+  grafana_datasources:
+    file: ./grafana/datasources.yaml
+  grafana_dashboard_providers:
+    file: ./grafana/dashboards.yaml
+  grafana_dashboard_logs:
+    file: ./grafana/dashboards/logs-overview.json
+  grafana_dashboard_api:
+    file: ./grafana/dashboards/api-errors.json
 
 
 services:
@@ -103,6 +111,15 @@ services:
       - internal
     volumes:
       - grafana-data:/var/lib/grafana
+    configs:
+      - source: grafana_datasources
+        target: /etc/grafana/provisioning/datasources/datasources.yaml
+      - source: grafana_dashboard_providers
+        target: /etc/grafana/provisioning/dashboards/dashboards.yaml
+      - source: grafana_dashboard_logs
+        target: /etc/grafana/dashboards/logs-overview.json
+      - source: grafana_dashboard_api
+        target: /etc/grafana/dashboards/api-errors.json
     environment:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
