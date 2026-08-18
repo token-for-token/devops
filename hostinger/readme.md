@@ -11,7 +11,7 @@ Layout mirrors [cipherdolls/devops/hostinger/](https://github.com/cipherdolls/de
 | Stack | File | What it runs |
 | --- | --- | --- |
 | `system` | `system-stack.yaml` | Traefik (TLS + ingress), Grafana, Loki, Prometheus, node-exporter, cadvisor. Owns the `public` + `internal` overlay networks. |
-| `prod`   | `prod-stack.yaml`   | hosted-gateway api + worker + one-shot prisma migrate, plus postgres / redis / bee / postgres-exporter. |
+| `prod`   | `prod-stack.yaml`   | hosted-gateway api + worker + one-shot prisma migrate, plus postgres / redis / bee / postgres-exporter / stamp-monitor. |
 | `dev`    | `dev-stack.yaml`    | Staging on `dev.t4t-gateway.com` — the `:develop` image tag against its own postgres / redis / bee volumes. |
 
 Supporting configs:
@@ -89,6 +89,38 @@ docker service update --image ghcr.io/token-for-token/hosted-gateway:main \
 lives in `/opt/t4t-gateway/.env` (chmod 600). Future work: migrate to a
 proper Docker secret backed by the host's secret manager — never an env var
 in the stack file.
+
+## Postage batches (stamp-monitor)
+
+The gateway's uploads are paid for by a postage batch that expires. When it
+lapsed, the gateway returned 500 on every route — see the comment above the
+`stamp-monitor` service for the full chain. `stamp-monitor` now owns renewal:
+it polls `prod_bee` every 5 min, tops a batch up when it drops under 14 days,
+and refuses any single action over 8 xBZZ.
+
+It runs beside Bee rather than reading the chain because **bucket fullness is
+not on-chain** — postage stamps are off-chain signatures, so only a node that
+saw them knows how full a batch is. A batch can be fully funded and still
+refuse writes.
+
+No Traefik route: it is on `internal` only, and its UI can spend xBZZ. Reach it
+over an SSH tunnel instead of publishing it:
+
+```bash
+ssh -L 8088:127.0.0.1:8088 root@<host>
+docker run --rm --network prod_internal -p 127.0.0.1:8088:8088 \
+  alpine/socat tcp-listen:8088,fork,reuseaddr tcp-connect:stamp-monitor:3000
+# then http://127.0.0.1:8088 with STAMP_MONITOR_ADMIN_TOKEN
+```
+
+Quick check without the UI:
+
+```bash
+docker service logs --tail 50 prod_stamp-monitor
+```
+
+`WEBHOOK_URL` is unset, so alerts (`wallet_low`, `batch_full`, `topup_blocked`)
+only reach the logs. Set it to make them reach a person.
 
 ## Backups
 

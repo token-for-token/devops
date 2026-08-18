@@ -8,6 +8,8 @@ networks:
 
 
 volumes:
+  stamp-monitor-data:
+    driver: local
   postgres-data:
     driver: local
   redis-data:
@@ -19,6 +21,57 @@ volumes:
 
 
 services:
+
+  # Watches this node's postage batches and renews them before they lapse.
+  #
+  # Added after the gateway went down because its batch fell under
+  # minTtlDays and the top-up it then attempted (64.64 xBZZ on a depth-24
+  # batch) exceeded the Bee wallet — ensureManagedStamp threw, and with it
+  # every route that boots the gateway context. Nothing was watching.
+  #
+  # Runs HERE rather than reading the chain from the homelab because bucket
+  # utilisation is not on-chain: stamps are off-chain signatures, so only a
+  # Bee node that saw them knows how full a batch is. Sitting next to prod_bee
+  # is what makes fullness, the bucket map and batch_full alerts possible.
+  stamp-monitor:
+    image: ghcr.io/ffaerber/swarm-stamp-monitor@sha256:62cf97f72090879f8d470fc9f2a09ab60d1d3a29dd658dfe2cd3a313c2b23540
+    networks: [internal]
+    volumes:
+      - stamp-monitor-data:/data
+    env_file:
+      - .env
+    environment:
+      BEE_URL: http://bee:1633
+      DB_PATH: /data/monitor.sqlite
+      ADMIN_TOKEN: '${STAMP_MONITOR_ADMIN_TOKEN}'
+      # Armed: the whole point is that nothing renewed the batch last time.
+      AUTO_TOPUP_ENABLED: "true"
+      DRY_RUN: "false"
+      TOPUP_WHEN_TTL_BELOW_DAYS: "14"
+      TOPUP_TARGET_TTL_DAYS: "60"
+      # 8 xBZZ is chosen, not arbitrary. A depth-20 top-up from 14d to 60d
+      # costs 6.19 and passes; the abandoned depth-25 batch would cost 129.28
+      # and is refused by this cap alone. The cap is the guard that stops the
+      # monitor reviving a batch we deliberately let expire.
+      MAX_TOPUP_BZZ_PER_BATCH: "8"
+      MAX_TOPUP_BZZ_PER_DAY: "15"
+      MIN_WALLET_BZZ: "10"
+      MIN_WALLET_XDAI: "0.2"
+      # OFF. The gateway re-stamps an identical chunk, so one bucket always
+      # trends full while the batch holds ~2 MB. Diluting that halves the TTL
+      # and doubles the monthly cost for no capacity gained — it is what took
+      # this batch from depth 24 to 25 and 129 xBZZ/month. On a MUTABLE batch
+      # a full bucket simply recycles its own duplicates, which is harmless.
+      DILUTE_ENABLED: "false"
+      PRICE_ENABLED: "true"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: 256M
 
   frontend:
     image: ghcr.io/token-for-token/hosted-gateway-frontend:main
@@ -203,10 +256,20 @@ services:
 
 
   bee:
-    # Pinned to 2.8.0 — matches the homelab Bee. Both speak the v15
+    # Pinned to 2.8.1 — matches the homelab Bee. Both speak the v15
     # handshake. Homelab uses a fresh data dir + --target-neighborhood
     # to keep the same swarmOverlay as its on-chain provider registration.
-    image: ethersphere/bee:2.8.0
+    #
+    # Moved off 2.8.0 because that build omits utilizationRatio from /stamps.
+    # The field is not optional in practice: without it a batch's fullness is
+    # unknown, and "unknown" read as 0% — a batch sitting at 215 of 256
+    # reported as empty, which is the one direction that fails silently.
+    # 2.8.1 sends it. (stamp-monitor now derives it either way, but the node
+    # should not be the thing lying.)
+    #
+    # Digest-pinned so a re-deploy cannot silently pick up a re-tagged image;
+    # this is a node holding a chequebook and a stake.
+    image: ethersphere/bee:2.8.1@sha256:1a7eeab7fc2725132716abd1aa50ceafb83ece59f171e4ea11deefc773e73a57
     # NOTE: BEE_BLOCKCHAIN_RPC_ENDPOINT env var is silently ignored — pass
     # the flag explicitly. Without it Bee logs "chain backend disabled".
     command:
