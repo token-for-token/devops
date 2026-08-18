@@ -125,6 +125,19 @@ ssh -L 8088:127.0.0.1:8088 root@<host>   # then http://127.0.0.1:8088
 docker service update --publish-rm published=8088,target=3000 prod_stamp-monitor
 ```
 
+The API authenticates with an **`x-admin-token`** header, not `Authorization:
+Bearer`. A wrong header is a 401; a missing `ADMIN_TOKEN` in the service is a
+503 (`admin API disabled`) — it fails closed, because these routes buy postage.
+
+**Deploy caveat:** `docker stack deploy` substitutes `${STAMP_MONITOR_ADMIN_TOKEN}`
+from the *shell*, not from `.env`. Source it first or the monitor deploys with an
+empty token and the dashboard 503s:
+
+```bash
+cd /root/devops/hostinger && set -a && . ./.env && set +a
+docker stack deploy -c prod-stack.yaml --resolve-image=never prod
+```
+
 `WEBHOOK_URL` is unset, so alerts (`wallet_low`, `batch_full`, `topup_blocked`)
 only reach the logs. Set it to make them reach a person.
 
