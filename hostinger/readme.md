@@ -50,9 +50,10 @@ docker swarm init --advertise-addr 195.35.25.26
 docker plugin install grafana/loki-docker-driver:2.9.7 \
     --alias loki --grant-all-permissions
 
-# Drop the stack files + configs on the host
-mkdir -p /opt/t4t-gateway && cd /opt/t4t-gateway
-# rsync this directory up here (or `git clone` the devops repo)
+# Stack files come from this repo, cloned on the host. Deploys run from the
+# clone, so `git pull` is the deploy step — do not hand-edit files here.
+git clone git@github.com:token-for-token/devops.git /root/devops
+cd /root/devops/hostinger
 cp .env.example .env && chmod 600 .env
 $EDITOR .env  # fill in OPERATOR_PRIVATE_KEY, JWT_SECRET_KEY, ...
 ```
@@ -62,7 +63,7 @@ $EDITOR .env  # fill in OPERATOR_PRIVATE_KEY, JWT_SECRET_KEY, ...
 The system stack creates the shared overlay networks, so deploy it first.
 
 ```bash
-cd /opt/t4t-gateway
+cd /root/devops/hostinger
 
 # 1. Networks + ingress + monitoring
 docker stack deploy -c system-stack.yaml system
@@ -86,7 +87,7 @@ docker service update --image ghcr.io/token-for-token/hosted-gateway:main \
 ## Secrets
 
 `OPERATOR_PRIVATE_KEY` is the on-chain identity for every tenant. For now it
-lives in `/opt/t4t-gateway/.env` (chmod 600). Future work: migrate to a
+lives in `/root/devops/hostinger/.env` (chmod 600). Future work: migrate to a
 proper Docker secret backed by the host's secret manager — never an env var
 in the stack file.
 
@@ -103,20 +104,25 @@ not on-chain** — postage stamps are off-chain signatures, so only a node that
 saw them knows how full a batch is. A batch can be fully funded and still
 refuse writes.
 
-No Traefik route: it is on `internal` only, and its UI can spend xBZZ. Reach it
-over an SSH tunnel instead of publishing it:
-
-```bash
-ssh -L 8088:127.0.0.1:8088 root@<host>
-docker run --rm --network prod_internal -p 127.0.0.1:8088:8088 \
-  alpine/socat tcp-listen:8088,fork,reuseaddr tcp-connect:stamp-monitor:3000
-# then http://127.0.0.1:8088 with STAMP_MONITOR_ADMIN_TOKEN
-```
-
-Quick check without the UI:
+No Traefik route and no published port: it is on `internal` only, and its UI
+can spend xBZZ. Note `internal` is **not attachable**, so `docker run --network
+internal ...` is refused — query through a container that is already on it:
 
 ```bash
 docker service logs --tail 50 prod_stamp-monitor
+
+M=$(docker ps --filter name=prod_stamp-monitor -q | head -1)
+docker exec $M bun -e 'console.log(await (await fetch("http://bee:1633/stamps")).text())'
+```
+
+For the dashboard, publish it only for as long as you are looking at it, and
+tunnel rather than exposing the port — swarm ingress binds `0.0.0.0`, so a
+published port is on the public internet:
+
+```bash
+docker service update --publish-add published=8088,target=3000 prod_stamp-monitor
+ssh -L 8088:127.0.0.1:8088 root@<host>   # then http://127.0.0.1:8088
+docker service update --publish-rm published=8088,target=3000 prod_stamp-monitor
 ```
 
 `WEBHOOK_URL` is unset, so alerts (`wallet_low`, `batch_full`, `topup_blocked`)
@@ -133,7 +139,7 @@ docker run --rm \
   alpine \
   sh -c "cd /from_volume && tar cvf /workdir/prod_postgres-data.tar ."
 
-scp root@195.35.25.26:/opt/t4t-gateway/prod_postgres-data.tar ~/Downloads
+scp root@195.35.25.26:/root/devops/hostinger/prod_postgres-data.tar ~/Downloads
 ```
 
 Bee data volume (postage batch / swarm keys — DO NOT lose this):
