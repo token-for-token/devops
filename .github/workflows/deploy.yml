@@ -17,6 +17,18 @@ jobs:
           host: ${{ secrets.SSH_KNOWN_HOSTS }}
           key: ${{ secrets.SSH_PRIV_KEY }}
           script: |
+            # Always log out, including when a pull or deploy below fails.
+            #
+            # GITHUB_TOKEN dies with the workflow run, but `docker login`
+            # persists it to /root/.docker/config.json on the HOST, where it
+            # outlives the run by however long until someone notices. Docker
+            # then presents that dead token on every later pull and does NOT
+            # fall back to anonymous, so even a public image fails with
+            # "No such image" — which reads like the image is missing rather
+            # than like the credential is stale. Deploys of unrelated services
+            # broke this way, and the workaround each time was to delete the
+            # ghcr.io entry by hand, pull, and put it back.
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
             cd ~/devops && git pull
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/token-for-token/hosted-gateway:main
