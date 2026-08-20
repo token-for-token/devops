@@ -34,8 +34,8 @@ services:
   # Bee node that saw them knows how full a batch is. Sitting next to prod_bee
   # is what makes fullness, the bucket map and batch_full alerts possible.
   stamp-monitor:
-    image: ghcr.io/ffaerber/swarm-stamp-monitor@sha256:62cf97f72090879f8d470fc9f2a09ab60d1d3a29dd658dfe2cd3a313c2b23540
-    networks: [internal]
+    image: ghcr.io/ffaerber/swarm-stamp-monitor@sha256:aebf7e471f41cfdf43f8b6bc8dcdba4d29bc277612a302f61b7ed805b243901c
+    networks: [internal, public]
     volumes:
       - stamp-monitor-data:/data
     env_file:
@@ -72,6 +72,25 @@ services:
         limits:
           cpus: "0.30"
           memory: 256M
+      # Published at bee.t4t-gateway.com. The gateway's own /bee page shows a
+      # summary; this is the full view — batch fullness, the bucket map, wallet
+      # and chequebook runway, and the action ledger.
+      #
+      # Safe to publish because the app fails CLOSED, not because the network
+      # protects it: every /api/admin route requires an x-admin-token and
+      # returns 503 when ADMIN_TOKEN is unset, so a misconfigured deploy is a
+      # visible outage rather than an open door onto endpoints that buy postage.
+      # The Bee node itself stays unpublished — reaching it through here still
+      # needs that token, which is the point of putting the monitor in front.
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public"
+        - "traefik.constraint-label=public"
+        - "traefik.http.routers.stamp-monitor.rule=Host(`bee.t4t-gateway.com`)"
+        - "traefik.http.routers.stamp-monitor.entrypoints=websecure"
+        - "traefik.http.routers.stamp-monitor.tls.certresolver=le"
+        - "traefik.http.services.stamp-monitor.loadbalancer.server.port=3000"
+        - "traefik.http.routers.stamp-monitor.middlewares=redirect-to-https"
 
   frontend:
     image: ghcr.io/token-for-token/hosted-gateway-frontend:main

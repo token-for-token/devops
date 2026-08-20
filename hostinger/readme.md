@@ -30,6 +30,7 @@ Point all of these at `195.35.25.26`:
 A  t4t-gateway.com               195.35.25.26
 A  www.t4t-gateway.com           195.35.25.26
 A  api.t4t-gateway.com           195.35.25.26
+A  bee.t4t-gateway.com           195.35.25.26
 A  dev.t4t-gateway.com           195.35.25.26
 A  traefik.t4t-gateway.com       195.35.25.26
 A  grafana.t4t-gateway.com       195.35.25.26
@@ -104,25 +105,25 @@ not on-chain** — postage stamps are off-chain signatures, so only a node that
 saw them knows how full a batch is. A batch can be fully funded and still
 refuse writes.
 
-No Traefik route and no published port: it is on `internal` only, and its UI
-can spend xBZZ. Note `internal` is **not attachable**, so `docker run --network
-internal ...` is refused — query through a container that is already on it:
+Published at **[bee.t4t-gateway.com](https://bee.t4t-gateway.com)**. The
+gateway's own `/bee` page shows a summary; this is the full view — batch
+fullness and the bucket map, wallet and chequebook runway, and the ledger of
+every top-up it has made or refused.
+
+It is publishable because the app fails **closed**: every `/api/admin` route
+requires an `x-admin-token` and returns 503 if `ADMIN_TOKEN` is unset, so a
+misconfigured deploy is a visible outage rather than an open door onto
+endpoints that spend xBZZ. The Bee node stays unpublished; reaching it through
+the monitor's passthrough still requires that token.
+
+From the shell, note `internal` is **not attachable**, so `docker run --network
+internal ...` is refused — query through a container already on it:
 
 ```bash
 docker service logs --tail 50 prod_stamp-monitor
 
 M=$(docker ps --filter name=prod_stamp-monitor -q | head -1)
 docker exec $M bun -e 'console.log(await (await fetch("http://bee:1633/stamps")).text())'
-```
-
-For the dashboard, publish it only for as long as you are looking at it, and
-tunnel rather than exposing the port — swarm ingress binds `0.0.0.0`, so a
-published port is on the public internet:
-
-```bash
-docker service update --publish-add published=8088,target=3000 prod_stamp-monitor
-ssh -L 8088:127.0.0.1:8088 root@<host>   # then http://127.0.0.1:8088
-docker service update --publish-rm published=8088,target=3000 prod_stamp-monitor
 ```
 
 The API authenticates with an **`x-admin-token`** header, not `Authorization:
