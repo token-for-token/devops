@@ -20,6 +20,11 @@ volumes:
     driver: local
 
 
+secrets:
+  stamp_monitor_admin_token:
+    external: true
+
+
 services:
 
   # Watches this node's postage batches and renews them before they lapse.
@@ -38,12 +43,20 @@ services:
     networks: [internal, public]
     volumes:
       - stamp-monitor-data:/data
+    secrets:
+      - stamp_monitor_admin_token
     env_file:
       - .env
     environment:
       BEE_URL: http://bee:1633
       DB_PATH: /data/monitor.sqlite
-      ADMIN_TOKEN: '${STAMP_MONITOR_ADMIN_TOKEN}'
+      # Read from a swarm secret, not an interpolated env var. The
+      # ${STAMP_MONITOR_ADMIN_TOKEN} form rendered correctly under `docker
+      # stack config` and still deployed EMPTY, which disables the admin API
+      # (503) while the service otherwise looks healthy — a dashboard that
+      # loads and can show nothing. A secret is mounted as a file and needs no
+      # substitution, so there is nothing left to silently resolve to "".
+      ADMIN_TOKEN_FILE: /run/secrets/stamp_monitor_admin_token
       # Armed: the whole point is that nothing renewed the batch last time.
       AUTO_TOPUP_ENABLED: "true"
       DRY_RUN: "false"
