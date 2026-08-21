@@ -39,7 +39,7 @@ services:
   # Bee node that saw them knows how full a batch is. Sitting next to prod_bee
   # is what makes fullness, the bucket map and batch_full alerts possible.
   stamp-monitor:
-    image: ghcr.io/ffaerber/swarm-stamp-monitor@sha256:bbe9c46b1f4761e7a8d51567990121ae51ac627b8d108f9979e99668bb90936a
+    image: ghcr.io/ffaerber/swarm-stamp-monitor@sha256:e17fced2f16fcb08f34a005d75eb51b2de1a6d9f81fbdecc752799f6ec7c5eac
     networks: [internal, public]
     volumes:
       - stamp-monitor-data:/data
