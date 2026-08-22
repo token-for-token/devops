@@ -27,7 +27,13 @@ secrets:
 
 services:
 
-  # Watches this node's postage batches and renews them before they lapse.
+  # bee-manager (was swarm-stamp-monitor): watches this node's postage batches
+  # and renews them before they lapse, plus the node facts that fail quietly.
+  #
+  # The service key, the volume and the secret keep their old names on purpose.
+  # The volume holds the SQLite database and the secret holds the admin token;
+  # renaming either to match a product name would detach the database or force
+  # the secret to be recreated, for no operational gain.
   #
   # Added after the gateway went down because its batch fell under
   # minTtlDays and the top-up it then attempted (64.64 xBZZ on a depth-24
@@ -39,7 +45,7 @@ services:
   # Bee node that saw them knows how full a batch is. Sitting next to prod_bee
   # is what makes fullness, the bucket map and batch_full alerts possible.
   stamp-monitor:
-    image: ghcr.io/ffaerber/swarm-stamp-monitor@sha256:d84cbf30e204a37b48782a5f4ad984d38ffca459bbe0b1adde838b6ba2810857
+    image: ghcr.io/ffaerber/bee-manager@sha256:d408741d3a0beb67a1372c296708f33beca94b2e48b2f7beb3bda514939dad12
     networks: [internal, public]
     volumes:
       - stamp-monitor-data:/data
